@@ -74,15 +74,15 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
 
     ---------- 日常使用 ----------
     启动仓库容器：
-      cd /home/user/ghcode/tls_repository && docker compose up
+      cd /home/user/tls_repository && docker compose up
     停止仓库容器：
-      cd /home/user/ghcode/tls_repository && docker compose down
+      cd /home/user/tls_repository && docker compose down
 
     ---------- 重置证书和密码 ----------
 
     如需重新生成证书（例如更换域名）或更改密码，但保留镜像数据：
 
-      1. 停止容器：cd /home/user/ghcode/tls_repository && docker compose down
+      1. 停止容器：cd /home/user/tls_repository && docker compose down
 
       2. 删除卷中的证书和密码文件：
 
