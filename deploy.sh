@@ -56,30 +56,60 @@ echo "正在构建镜像并启动容器..."
 docker compose up --build -d
 
 if [ $? -eq 0 ]; then
-    # 确定主要地址：如果用户输入的是IP，则用该IP；否则用第一个域名
+    # 确定主要地址（纯主机名/IP，不带端口）
     if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null; then
         MAIN_ADDR="$ADDRESS"
     else
         MAIN_ADDR="$_ssca_CN"
     fi
 
+    echo "等待容器启动并获取映射端口（最多60秒）..."
+    # 等待最多60秒，直到容器运行且端口映射可用
+    WAIT_SECONDS=60
+    while [ $WAIT_SECONDS -gt 0 ]; do
+        # 检查容器状态是否为 running
+        if docker compose ps --status running registry2 | grep -q "registry2"; then
+            # 尝试获取端口
+            HOST_PORT=$(docker compose port registry2 5000 2>/dev/null | cut -d: -f2)
+            if [ -n "$HOST_PORT" ]; then
+                break
+            fi
+        fi
+        sleep 1
+        WAIT_SECONDS=$((WAIT_SECONDS - 1))
+    done
+
+    if [ -z "$HOST_PORT" ]; then
+        echo "警告：等待60秒后仍无法获取映射端口，将默认使用443。"
+        HOST_PORT="443"
+    fi
+
+    # 根据端口生成带端口的访问地址和证书目录名
+    if [ "$HOST_PORT" = "443" ]; then
+        ADDR_WITH_PORT="$MAIN_ADDR"
+        CERT_DIR="$MAIN_ADDR"
+    else
+        ADDR_WITH_PORT="${MAIN_ADDR}:${HOST_PORT}"
+        CERT_DIR="${MAIN_ADDR}:${HOST_PORT}"
+    fi
+
     echo "=========================================="
     echo "部署成功！"
-    echo "私有镜像仓库主要地址: https://$MAIN_ADDR"
+    echo "私有镜像仓库主要地址: https://$ADDR_WITH_PORT"
     echo ""
     echo "查询仓库镜像列表："
-    echo "  curl -k -u \"admin:${PASSWORD}\" https://${MAIN_ADDR}/v2/_catalog"
+    echo "  curl -k -u \"admin:${PASSWORD}\" https://${ADDR_WITH_PORT}/v2/_catalog"
     echo ""
     echo "先执行 分发证书 步骤，将证书部署到 Docker 客户端，然后再尝试以下操作："
     echo ""
-    echo "登录: docker login $MAIN_ADDR -u admin -p $PASSWORD"
-    echo "注销登录: docker logout $MAIN_ADDR "
+    echo "登录: docker login $ADDR_WITH_PORT -u admin -p $PASSWORD"
+    echo "注销登录: docker logout $ADDR_WITH_PORT"
     echo ""
     echo "推送测试："
     echo ""
-    echo "  docker tag ${PROJECT_NAME}-registry2:latest ${MAIN_ADDR}/${PROJECT_NAME}-registry2:latest"
+    echo "  docker tag ${PROJECT_NAME}-registry2:latest ${ADDR_WITH_PORT}/${PROJECT_NAME}-registry2:latest"
     echo ""
-    echo "  docker push ${MAIN_ADDR}/${PROJECT_NAME}-registry2:latest"
+    echo "  docker push ${ADDR_WITH_PORT}/${PROJECT_NAME}-registry2:latest"
     echo ""
     echo "---------- 分发证书 ----------"
     echo ""
@@ -102,10 +132,10 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "分发证书到内网的各个主机（略）。"
     echo ""
-    echo "各主机将证书部署到 Docker 客户端（以主要地址 $MAIN_ADDR 为例）："
+    echo "各主机将证书部署到 Docker 客户端（以主要地址 $ADDR_WITH_PORT 为例）："
     echo ""
-    echo "  sudo mkdir -p /etc/docker/certs.d/$MAIN_ADDR"
-    echo "  sudo cp domain.crt /etc/docker/certs.d/$MAIN_ADDR/ca.crt"
+    echo "  sudo mkdir -p /etc/docker/certs.d/$CERT_DIR"
+    echo "  sudo cp domain.crt /etc/docker/certs.d/$CERT_DIR/ca.crt"
     echo "  sudo systemctl restart docker   # 可选"
     echo ""
     echo "---------- 日常使用 ----------"
@@ -134,7 +164,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "=========================================="
 else
-    echo "部署失败，请检查日志： docker compose logs <service>"
+    echo "部署失败，请检查日志： docker compose logs registry2"
     exit 1
 fi
 
