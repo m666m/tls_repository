@@ -26,7 +26,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # 声明卷，与宿主机挂载点对应
-# 注意：基础镜像 registry:2 有一个声明卷 /var/lib/registry，在后面的 compose.yml 里用 na 卷做了个占位挂载，避免了每次运行时会创建一个匿名卷
+# 注意：基础镜像 registry:2 有一个声明卷 /var/lib/registry，在后面的 compose.yaml 里用 na 卷做了个占位挂载，避免了每次运行时会创建一个匿名卷
 VOLUME ["/certs", "/auth", "/data"]
 
 # 声明容器内服务端口为 5000，来自基础镜像 registry:2

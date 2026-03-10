@@ -16,119 +16,51 @@ fi
 PASSWORD="$1"
 ADDRESS="$2"
 
-# ---------- 辅助函数 ----------
-# 向 IP_LIST 中添加 IP，确保唯一性并按指定位置插入
-add_ip_to_list() {
-    local ip="$1"
-    local position="$2"   # front 或 back
-    local new_list=""
-
-    # 如果当前列表非空，先移除已有的相同 IP
-    if [ -n "$IP_LIST" ]; then
-        # 将列表拆分为行，过滤掉要添加的 IP，再重新组合
-        new_list=$(echo "$IP_LIST" | tr ' ' '\n' | grep -v "^$ip$" | tr '\n' ' ' | sed 's/ $//')
-    fi
-
-    # 按位置插入 IP
-    if [ "$position" = "front" ]; then
-        IP_LIST="$ip $new_list"
-    else
-        IP_LIST="$new_list $ip"
-    fi
-    # 去除可能的多余空格
-    IP_LIST=$(echo "$IP_LIST" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-}
-
-# 向 DOMAINS 中添加域名（插入最前），自动去重
-add_domain_front() {
-    local domain="$1"
-    local new_list=""
-
-    if [ -n "$DOMAINS" ]; then
-        new_list=$(echo "$DOMAINS" | tr ' ' '\n' | grep -v "^$domain$" | tr '\n' ' ' | sed 's/ $//')
-    fi
-
-    DOMAINS="$domain $new_list"
-    DOMAINS=$(echo "$DOMAINS" | tr -s ' ' | sed 's/^ *//;s/ *$//')
-}
-
-# ---------- 初始化 IP_LIST ----------
-IP_LIST=""
-# 收集本机所有非回环 IPv4 地址（按原有顺序）
-for ip in $(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127\.'); do
-    add_ip_to_list "$ip" "back"
-done
-# 添加 127.0.0.1（若已存在则自动去重，并置于最后）
-add_ip_to_list "127.0.0.1" "back"
-
-# ---------- 初始化 DOMAINS ----------
-HOSTNAME=$(hostname)
-if [[ "$HOSTNAME" == *.* ]]; then
-    # 主机名已包含点，直接使用
-    INIT_DOMAIN="$HOSTNAME"
-else
-    # 否则添加 .local
-    INIT_DOMAIN="${HOSTNAME}.local"
+# 检查 _ssca.sh 是否存在
+if [ ! -f _ssca.sh ]; then
+    echo "错误：当前目录下未找到 _ssca.sh 文件"
+    exit 1
 fi
-DOMAINS="$INIT_DOMAIN localhost"
 
-# ---------- 处理用户输入 ----------
-if [ -n "$ADDRESS" ]; then
-    # 判断是否为 IPv4 地址
-    if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-        echo "检测到输入为 IP 地址: $ADDRESS"
-        # 将用户输入的 IP 添加到 IP_LIST 最前面
-        add_ip_to_list "$ADDRESS" "front"
-        echo "证书SAN属性的 IP 地址: $IP_LIST"
-        echo "证书SAN属性的域名: $DOMAINS"   # 域名保持初始值
-    else
-        # 用户输入的是域名
-        echo "检测到输入为域名: $ADDRESS"
-        # 构造完整域名
-        if [ "$ADDRESS" = "localhost" ]; then
-            FULL_DOMAIN="localhost"
-        elif ! echo "$ADDRESS" | grep -q '\.'; then
-            FULL_DOMAIN="${ADDRESS}.local"
-        else
-            FULL_DOMAIN="$ADDRESS"
-        fi
-        # 添加到 DOMAINS 最前面
-        add_domain_front "$FULL_DOMAIN"
-        echo "证书SAN属性的域名: $DOMAINS"
-        echo "证书SAN属性的 IP 地址: $IP_LIST"
-    fi
-else
-    echo "未指定地址，使用默认值"
-    echo "证书SAN属性的域名: $DOMAINS"
-    echo "证书SAN属性的 IP 地址: $IP_LIST"
-fi
+# ---------- 调用 _ssca.sh 生成证书信息 ----------
+source ./_ssca.sh "$ADDRESS"
+
+# 此时已获得以下环境变量：
+#   _ssca_CN         证书 CN（第一个域名）
+#   _ssca_SAN        完整的 subjectAltName 字符串（可用于 openssl）
+#   _ssca_SAN_DNS    空格分隔的域名列表
+#   _ssca_SAN_IP     空格分隔的 IP 列表
+
+# 输出信息供用户确认
+echo "证书SAN属性的域名: $_ssca_SAN_DNS"
+echo "证书SAN属性的 IP 地址: $_ssca_SAN_IP"
 
 # 项目名（目录名）
 PROJECT_NAME=$(basename "$(pwd)")
 echo "项目名: $PROJECT_NAME"
 
-# 检查 compose.yml 是否存在
-if [ ! -f compose.yml ]; then
-    echo "错误：当前目录下未找到 compose.yml 文件"
+# 检查 compose.yaml 是否存在
+if [ ! -f compose.yaml ]; then
+    echo "错误：当前目录下未找到 compose.yaml 文件"
     exit 1
 fi
 
-# 替换 compose.yml 中的变量（使用双引号包裹）
-sed -i "s|^\(\s*- DOMAINS=\).*|\1\"${DOMAINS}\"|" compose.yml
-sed -i "s|^\(\s*- IP_ADDRS=\).*|\1\"${IP_LIST}\"|" compose.yml
-sed -i "s|^\(\s*- AUTH_PASS=\).*|\1${PASSWORD}|" compose.yml
+# 替换 compose.yaml 中的变量（使用双引号包裹）
+sed -i "s|^\(\s*- DOMAINS=\).*|\1\"${_ssca_SAN_DNS}\"|" compose.yaml
+sed -i "s|^\(\s*- IP_ADDRS=\).*|\1\"${_ssca_SAN_IP}\"|" compose.yaml
+sed -i "s|^\(\s*- AUTH_PASS=\).*|\1${PASSWORD}|" compose.yaml
 
-echo "compose.yml 已更新"
+echo "compose.yaml 已更新"
 
 echo "正在构建镜像并启动容器..."
 docker compose up --build -d
 
 if [ $? -eq 0 ]; then
-    if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    # 确定主要地址：如果用户输入的是IP，则用该IP；否则用第一个域名
+    if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null; then
         MAIN_ADDR="$ADDRESS"
     else
-        # 取第一个域名作为主要地址
-        MAIN_ADDR=$(echo "$DOMAINS" | cut -d' ' -f1)
+        MAIN_ADDR="$_ssca_CN"
     fi
 
     echo "=========================================="
@@ -202,7 +134,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "=========================================="
 else
-    echo "部署失败，请检查日志"
+    echo "部署失败，请检查日志： docker compose logs <service>"
     exit 1
 fi
 
