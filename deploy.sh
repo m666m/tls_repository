@@ -5,8 +5,8 @@ set -e
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
     echo "用法: $0 <密码> [仓库地址]"
     echo "示例:"
-    echo "  $0 123456                    # 使用 hostname.local 作为域名"
-    echo "  $0 123456 myregistry.local   # 使用指定域名（FQDN）"
+    echo "  $0 123456                     # 使用 hostname.local 作为域名"
+    echo "  $0 123456 myregistry.local    # 使用指定域名（FQDN）"
     echo "  $0 123456 myhost              # 短名，自动补 .local"
     echo "  $0 123456 192.168.1.100       # 使用指定 IP，域名取 hostname.local"
     echo "仓库地址可以是 IP 或域名（FQDN 或短名），用于CA证书SAN属性的域名和ip地址，docker 客户端访问仓库时使用。登录用户名 admin。"

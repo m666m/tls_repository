@@ -10,8 +10,8 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
     $ ./deploy.sh
     用法: ./deploy.sh <密码> [仓库地址]
     示例:
-    ./deploy.sh 123456                    # 使用 hostname.local 作为域名
-    ./deploy.sh 123456 myregistry.local   # 使用指定域名（FQDN）
+    ./deploy.sh 123456                     # 使用 hostname.local 作为域名
+    ./deploy.sh 123456 myregistry.local    # 使用指定域名（FQDN）
     ./deploy.sh 123456 myhost              # 短名，自动补 .local
     ./deploy.sh 123456 192.168.1.100       # 使用指定 IP，域名取 hostname.local
 
@@ -21,8 +21,8 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
 
     $ ./deploy.sh 123456 192.168.1.100
     检测到输入为 IP 地址: 192.168.1.100
-    证书SAN属性的 IP 地址: 192.168.1.100 172.17.0.1
-    证书SAN属性的域名: my-host.local
+    证书SAN属性的 IP 地址: 192.168.1.100 172.17.0.1 127.0.0.1
+    证书SAN属性的域名: myhost.local localhost
     项目名: tls_repository
     compose.yml 已更新
     正在构建镜像并启动容器...
@@ -44,7 +44,7 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
 
     推送测试：
 
-      docker tag tls_repository-registry2:latest 192.168.1.100/    tls_repository-registry2:latest
+      docker tag tls_repository-registry2:latest 192.168.1.100/tls_repository-registry2:latest
 
       docker push 192.168.1.100/tls_repository-registry2:latest
 
@@ -74,19 +74,19 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
 
     ---------- 日常使用 ----------
     启动仓库容器：
-      cd /home/your_user/ghcode/tls_repository && docker compose up
+      cd /home/user/ghcode/tls_repository && docker compose up
     停止仓库容器：
-      cd /home/your_user/ghcode/tls_repository && docker compose down
+      cd /home/user/ghcode/tls_repository && docker compose down
 
     ---------- 重置证书和密码 ----------
 
     如需重新生成证书（例如更换域名）或更改密码，但保留镜像数据：
 
-      1. 停止容器：cd /home/your_user/ghcode/tls_repository && docker compose down
+      1. 停止容器：cd /home/user/ghcode/tls_repository && docker compose down
 
       2. 删除卷中的证书和密码文件：
 
-        docker run --rm -v tls_repository_certs:/certs alpine rm -f /certs/domain.crt / certs/domain.key
+        docker run --rm -v tls_repository_certs:/certs alpine rm -f /certs/domain.crt /certs/domain.key
 
         docker run --rm -v tls_repository_auth:/auth alpine rm -f /auth/htpasswd
 
