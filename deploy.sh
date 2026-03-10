@@ -16,7 +16,8 @@ fi
 PASSWORD="$1"
 ADDRESS="$2"
 
-# ---------- 辅助函数：向 IP_LIST 中添加 IP，确保唯一性并按指定位置插入 ----------
+# ---------- 辅助函数 ----------
+# 向 IP_LIST 中添加 IP，确保唯一性并按指定位置插入
 add_ip_to_list() {
     local ip="$1"
     local position="$2"   # front 或 back
@@ -38,51 +39,67 @@ add_ip_to_list() {
     IP_LIST=$(echo "$IP_LIST" | tr -s ' ' | sed 's/^ *//;s/ *$//')
 }
 
-# 初始化的ip列表：获取本机所有非回环 IPv4 地址（始终收集）
-IP_LIST=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127\.' | tr '\n' ' ' | sed 's/ $//')
-if [ -z "$IP_LIST" ]; then
-    IP_LIST="127.0.0.1"
-fi
+# 向 DOMAINS 中添加域名（插入最前），自动去重
+add_domain_front() {
+    local domain="$1"
+    local new_list=""
 
-# 地址参数处理
+    if [ -n "$DOMAINS" ]; then
+        new_list=$(echo "$DOMAINS" | tr ' ' '\n' | grep -v "^$domain$" | tr '\n' ' ' | sed 's/ $//')
+    fi
+
+    DOMAINS="$domain $new_list"
+    DOMAINS=$(echo "$DOMAINS" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+}
+
+# ---------- 初始化 IP_LIST ----------
+IP_LIST=""
+# 收集本机所有非回环 IPv4 地址（按原有顺序）
+for ip in $(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '^127\.'); do
+    add_ip_to_list "$ip" "back"
+done
+# 添加 127.0.0.1（若已存在则自动去重，并置于最后）
+add_ip_to_list "127.0.0.1" "back"
+
+# ---------- 初始化 DOMAINS ----------
+HOSTNAME=$(hostname)
+if [[ "$HOSTNAME" == *.* ]]; then
+    # 主机名已包含点，直接使用
+    INIT_DOMAIN="$HOSTNAME"
+else
+    # 否则添加 .local
+    INIT_DOMAIN="${HOSTNAME}.local"
+fi
+DOMAINS="$INIT_DOMAIN localhost"
+
+# ---------- 处理用户输入 ----------
 if [ -n "$ADDRESS" ]; then
     # 判断是否为 IPv4 地址
     if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
         echo "检测到输入为 IP 地址: $ADDRESS"
-        # 将该 IP 添加到 IP_LIST 最前面
+        # 将用户输入的 IP 添加到 IP_LIST 最前面
         add_ip_to_list "$ADDRESS" "front"
         echo "证书SAN属性的 IP 地址: $IP_LIST"
-
-        # 使用 hostname.local 作为域名
-        DOMAIN="$(hostname).local"
-        echo "证书SAN属性的域名: $DOMAIN"
-
+        echo "证书SAN属性的域名: $DOMAINS"   # 域名保持初始值
     else
         # 用户输入的是域名
         echo "检测到输入为域名: $ADDRESS"
+        # 构造完整域名
         if [ "$ADDRESS" = "localhost" ]; then
-            # localhost 则使用 hostname.local
-            DOMAIN="$(hostname).local"
+            FULL_DOMAIN="localhost"
         elif ! echo "$ADDRESS" | grep -q '\.'; then
-            # 不包含点，追加 .local
-            DOMAIN="${ADDRESS}.local"
+            FULL_DOMAIN="${ADDRESS}.local"
         else
-            # 已经是 FQDN
-            DOMAIN="$ADDRESS"
+            FULL_DOMAIN="$ADDRESS"
         fi
-        echo "证书SAN属性的域名: $DOMAIN"
-
-        # 添加 127.0.0.1 到末尾
-        add_ip_to_list "127.0.0.1" "back"
+        # 添加到 DOMAINS 最前面
+        add_domain_front "$FULL_DOMAIN"
+        echo "证书SAN属性的域名: $DOMAINS"
         echo "证书SAN属性的 IP 地址: $IP_LIST"
     fi
 else
-    # 未提供地址，使用 hostname.local
-    DOMAIN="$(hostname).local"
-    echo "未指定域名，证书SAN属性的域名设置为: $DOMAIN"
-
-    # 添加 127.0.0.1 到末尾
-    add_ip_to_list "127.0.0.1" "back"
+    echo "未指定地址，使用默认值"
+    echo "证书SAN属性的域名: $DOMAINS"
     echo "证书SAN属性的 IP 地址: $IP_LIST"
 fi
 
@@ -96,11 +113,9 @@ if [ ! -f compose.yml ]; then
     exit 1
 fi
 
-# 使用 | 作为分隔符替换 DOMAIN、IP_ADDRS 和密码行：
-# 如果密码或域名中包含字符 '|'，需要手动转义或改用其他分隔符（如 #）
-# 注意：替换后会移除行末的注释（如有）
-sed -i "s|^\(\s*- DOMAIN=\).*|\1${DOMAIN}|" compose.yml
-sed -i "s|^\(\s*- IP_ADDRS=\).*|\1${IP_LIST}|" compose.yml
+# 替换 compose.yml 中的变量（使用双引号包裹）
+sed -i "s|^\(\s*- DOMAINS=\).*|\1\"${DOMAINS}\"|" compose.yml
+sed -i "s|^\(\s*- IP_ADDRS=\).*|\1\"${IP_LIST}\"|" compose.yml
 sed -i "s|^\(\s*- AUTH_PASS=\).*|\1${PASSWORD}|" compose.yml
 
 echo "compose.yml 已更新"
@@ -112,7 +127,8 @@ if [ $? -eq 0 ]; then
     if echo "$ADDRESS" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
         MAIN_ADDR="$ADDRESS"
     else
-        MAIN_ADDR="$DOMAIN"
+        # 取第一个域名作为主要地址
+        MAIN_ADDR=$(echo "$DOMAINS" | cut -d' ' -f1)
     fi
 
     echo "=========================================="
@@ -174,9 +190,9 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "  2. 删除卷中的证书和密码文件："
     echo ""
-    echo "     docker run --rm -v $CERT_VOL:/certs alpine rm -f /certs/domain.crt /certs/domain.key"
+    echo "    docker run --rm -v $CERT_VOL:/certs alpine rm -f /certs/domain.crt /certs/domain.key"
     echo ""
-    echo "     docker run --rm -v $AUTH_VOL:/auth alpine rm -f /auth/htpasswd"
+    echo "    docker run --rm -v $AUTH_VOL:/auth alpine rm -f /auth/htpasswd"
     echo ""
     echo "  3. 重新运行 deploy.sh 并指定新密码和域名"
     echo ""
@@ -189,3 +205,4 @@ else
     echo "部署失败，请检查日志"
     exit 1
 fi
+

@@ -3,8 +3,8 @@ set -e
 
 # 接收如下环境变量
 #   TZ            自制镜像支持用环境变量设置时区
-#   DOMAIN        用于生成CA证书SAN属性的域名列表，docker 客户端访问仓库可以使用这些域名，否则 tls 报错。
-#   IP_ADDRS      用于生成CA证书SAN属性的ip地址列表，docker 客户端访问仓库可以使用这些ip地址，否则 tls 报错。
+#   DOMAINS       用于生成CA证书SAN属性的域名列表（空格分隔）
+#   IP_ADDRS      用于生成CA证书SAN属性的ip地址列表（空格分隔）
 #   AUTH_USER     用于生成 htpasswd 认证的用户名
 #   AUTH_PASS     用于生成 htpasswd 认证的密码
 #
@@ -14,25 +14,44 @@ set -e
 # ---------- TLS 证书处理 ----------
 if [ ! -f /certs/domain.crt ] || [ ! -f /certs/domain.key ]; then
     # 需要生成证书，必须提供域名或 IP 列表
-    if [ -z "$DOMAIN" ] && [ -z "$IP_ADDRS" ]; then
-        echo "错误：未找到现有证书，且环境变量 DOMAIN 和 IP_ADDRS 均为空。"
-        echo "请挂载已有证书到 /certs，或通过 -e DOMAIN=... 和/或 -e IP_ADDRS=... 提供至少一个域名或 IP 以自动生成证书。"
+    if [ -z "$DOMAINS" ] && [ -z "$IP_ADDRS" ]; then
+        echo "错误：未找到现有证书，且环境变量 DOMAINS 和 IP_ADDRS 均为空。"
+        echo "请挂载已有证书到 /certs，或通过 -e DOMAINS=... 和/或 -e IP_ADDRS=... 提供至少一个域名或 IP 以自动生成证书。"
         exit 1
     fi
 
-    # 确定 CN：优先使用 DOMAIN，否则使用 IP_ADDRS 的第一个 IP
-    if [ -n "$DOMAIN" ]; then
-        CN="$DOMAIN"
+    # 去除可能存在的首尾双引号（兼容直接传递带引号的字符串）
+    DOMAINS=$(echo "$DOMAINS" | sed -e 's/^"//' -e 's/"$//')
+    IP_ADDRS=$(echo "$IP_ADDRS" | sed -e 's/^"//' -e 's/"$//')
+
+    # 确定 CN：使用 DOMAINS 的第一个域名，否则用 IP_ADDRS 的第一个 IP
+    if [ -n "$DOMAINS" ]; then
+        CN=$(echo "$DOMAINS" | cut -d' ' -f1)
     else
         CN=$(echo "$IP_ADDRS" | cut -d' ' -f1)
     fi
     echo "未找到证书文件，正在生成自签名证书，CN=${CN}..."
 
-    # 构建 subjectAltName 扩展
-    SAN="DNS:${CN}"   # 至少包含 CN
+    # 构建 subjectAltName 扩展（支持多个 DNS 和 IP）
+    SAN=""
+    # 添加所有 DNS 条目
+    if [ -n "$DOMAINS" ]; then
+        for dns in $DOMAINS; do
+            if [ -z "$SAN" ]; then
+                SAN="DNS:${dns}"
+            else
+                SAN="${SAN},DNS:${dns}"
+            fi
+        done
+    fi
+    # 添加所有 IP 条目
     if [ -n "$IP_ADDRS" ]; then
         for ip in $IP_ADDRS; do
-            SAN="${SAN},IP:${ip}"
+            if [ -z "$SAN" ]; then
+                SAN="IP:${ip}"
+            else
+                SAN="${SAN},IP:${ip}"
+            fi
         done
     fi
 
@@ -48,7 +67,6 @@ if [ ! -f /certs/domain.crt ] || [ ! -f /certs/domain.key ]; then
     echo "提示：请将 /certs/domain.crt 复制到 Docker 客户端信任目录，路径格式为 /etc/docker/certs.d/${CN}/ca.crt"
 else
     echo "使用现有证书（/certs/domain.crt 和 /certs/domain.key）"
-    CN="$DOMAIN"
 fi
 
 export REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt

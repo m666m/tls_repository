@@ -1,5 +1,6 @@
 # tls_repository
-Auto deployment of an docker repository based on Docker Registry 2, supporting TLS and htpasswd authentication.
+
+Auto deployment of an docker repository based on Docker Registry 2, supporting self-signed certificate for TLS and htpasswd authentication.
 
 ## Usage
 
@@ -96,4 +97,3 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting T
       docker compose down -v
 
     ==========================================
-
