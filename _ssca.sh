@@ -8,6 +8,12 @@
 #   _ssca_SAN_DNS   空格分隔的域名列表
 #   _ssca_SAN_IP    空格分隔的 IP 列表
 
+# 检测脚本是否通过 source 执行
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "错误：此脚本必须通过 source 命令加载，不能直接执行。" >&2
+    exit 1
+fi
+
 # 辅助函数：向列表中添加元素（去重，可指定前后位置）
 _add_to_list() {
     local item="$1"
