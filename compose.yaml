@@ -3,18 +3,17 @@ services:
     build: .                    # 使用当前目录的 Dockerfile 构建镜像
     restart: always             # 容器退出后自动重启
     ports:
-      - "443:5000"              # 宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
+      - "443:5000"              # <-- 最好是宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
     volumes:
       - certs:/certs            # 命名卷 certs 挂载到 /certs
       - auth:/auth              # 命名卷 auth 挂载到 /auth
-      - data:/data              # 命名卷 data 挂载到 /data
-      - na:/var/lib/registry    # 占位用，以免基础镜像 registry:2 的 VOLUME 不挂载每次运行出现一个匿名卷，其实这个目录在 entrypoint.sh 已经用环境变量指向 /data 了
+      - data:/var/lib/registry  # 命名卷 data 挂载到 /var/lib/registry
     environment:
       - TZ=Asia/Shanghai        # 使用本地时区查看日志更方便
-      - DOMAINS=myregistry.local    # ⚠️ 用于CA证书SAN属性的域名（空格分隔多个），请根据实际域名修改，将被 deploy.sh 替换
-      - IP_ADDRS=127.0.0.1          # ⚠️ 用于CA证书SAN属性的ip地址（空格分隔多个），请根据实际 IP 修改，将被 deploy.sh 替换
+      - DOMAINS=myregistry.local    # <-- 用于CA证书SAN属性的域名（空格分隔多个），请根据实际域名修改，将被 deploy.sh 替换
+      - IP_ADDRS=127.0.0.1          # <-- 用于CA证书SAN属性的ip地址（空格分隔多个），请根据实际 IP 修改，将被 deploy.sh 替换
       - AUTH_USER=admin             # 用于 htpasswd 认证的用户名
-      - AUTH_PASS=secretpassword    # 用于 htpasswd 认证的密码，将被 deploy.sh 替换
+      - AUTH_PASS=secretpassword    # <-- 用于 htpasswd 认证的密码，将被 deploy.sh 替换
     # 健康检查：使用 curl 访问 registry 的 v2 端点（忽略证书验证），只要服务能响应（包括 401 未授权）即视为健康
     healthcheck:
       test: ["CMD", "curl", "-k", "https://localhost:5000/v2/"]
@@ -28,4 +27,3 @@ volumes:
   certs:
   auth:
   data:
-  na:

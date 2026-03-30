@@ -30,8 +30,8 @@ if [ ! -f /certs/domain.crt ] || [ ! -f /certs/domain.key ]; then
     else
         CN=$(echo "$IP_ADDRS" | cut -d' ' -f1)
     fi
-    echo "未找到证书文件，正在生成自签名证书，CN=${CN}..."
 
+    echo "生成自签名证书，CN=${CN}..."
     # 构建 subjectAltName 扩展（支持多个 DNS 和 IP）
     SAN=""
     # 添加所有 DNS 条目
@@ -44,6 +44,7 @@ if [ ! -f /certs/domain.crt ] || [ ! -f /certs/domain.key ]; then
             fi
         done
     fi
+
     # 添加所有 IP 条目
     if [ -n "$IP_ADDRS" ]; then
         for ip in $IP_ADDRS; do
@@ -91,10 +92,6 @@ export REGISTRY_AUTH=htpasswd
 export REGISTRY_AUTH_HTPASSWD_REALM="Registry Realm"
 export REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
 
-# ---------- 存储路径 ----------
-export REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/data
-
 # ---------- 启动 ----------
 echo "启动 Docker Registry (HTTPS) - 主要地址: ${CN:-未知}"
 exec registry serve /etc/docker/registry/config.yml
-

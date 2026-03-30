@@ -19,15 +19,18 @@ RUN ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && \
     echo ${TZ} > /etc/timezone
 
 # 创建必要的目录
-RUN mkdir -p /certs /auth /data
+RUN mkdir -p /certs /auth /var/lib/registry
+RUN mkdir -p /etc/docker/registry
+
+# 复制预置的默认配置文件
+COPY config.yml /etc/docker/registry/config.yml
 
 # 复制启动脚本
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # 声明卷，与宿主机挂载点对应
-# 注意：基础镜像 registry:2 有一个声明卷 /var/lib/registry，在后面的 compose.yaml 里用 na 卷做了个占位挂载，避免了每次运行时会创建一个匿名卷
-VOLUME ["/certs", "/auth", "/data"]
+VOLUME ["/certs", "/auth", "/var/lib/registry"]
 
 # 声明容器内服务端口为 5000，来自基础镜像 registry:2
 EXPOSE 5000
@@ -39,4 +42,3 @@ EXPOSE 5000
 #  CMD curl -k https://localhost:5000/v2/ || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-
