@@ -3,7 +3,7 @@ services:
     build: .                    # 使用当前目录的 Dockerfile 构建镜像
     restart: always             # 容器退出后自动重启
     ports:
-      - "5443:5000"              # <-- 最好是宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
+      - "5443:5000"             # <-- 最好是宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
     volumes:
       - certs:/certs            # 命名卷 certs 挂载到 /certs
       - auth:/auth              # 命名卷 auth 挂载到 /auth
@@ -31,7 +31,9 @@ services:
       # UI 基本配置
       - SINGLE_REGISTRY=true    # 隐藏“添加其他仓库”菜单，固定使用一个仓库
       - REGISTRY_TITLE=My Private Registry   # 页面标题
+      - SHOW_CONTENT_DIGEST=true    # 显示摘要
       - DELETE_IMAGES=true      # 启用镜像删除功能
+
       - REGISTRY_SECURED=true   # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
 
       # 代理配置：将 UI 容器内的 Nginx 反向代理到 registry2 容器
@@ -40,7 +42,7 @@ services:
       - NGINX_PROXY_PASS_SSL_VERIFY=off
 
       # 认证头注入：为所有代理请求添加 Authorization 头，格式 "Basic <base64>"
-      # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码
+      # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码，将被 deploy.sh 替换
       #   生成命令：echo -n "admin:123456" | base64  输出为 YWRtaW46MTIzNDU2
       - NGINX_PROXY_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
     depends_on:
