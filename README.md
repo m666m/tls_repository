@@ -1,6 +1,6 @@
 # tls_repository
 
-Auto deployment of an docker repository based on Docker Registry 2, supporting self-signed certificate for TLS and htpasswd authentication.
+Auto deployment of an docker repository based on Docker Registry 2, supporting self-signed certificate for TLS and htpasswd authentication, and provide a web UI: joxit/docker-registry-ui.
 
 ## Usage
 
@@ -32,21 +32,22 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
      ✔ Container tls_repository-registry2-1 Started    0.6s
     ==========================================
     部署成功！
-    私有镜像仓库主要地址: https://192.168.1.100
+    私有镜像仓库主要地址: https://192.168.1.100:5443
+    浏览器访问 UI 管理镜像: http://192.168.1.100:8443
 
     查询仓库镜像列表：
-      curl -k -u "admin:123456" https://192.168.1.100/v2/_catalog
+      curl -k -u "admin:123456" https://192.168.1.100:5443/v2/_catalog
 
     先执行 分发证书 步骤，将证书部署到 Docker 客户端，然后再尝试以下操作：
 
-    登录: docker login 192.168.1.100 -u admin -p 123456
-    注销登录: docker logout 192.168.1.100
+    登录: docker login 192.168.1.100:5443 -u admin -p 123456
+    注销登录: docker logout 192.168.1.100:5443
 
     推送测试：
 
-      docker tag tls_repository-registry2:latest 192.168.1.100/tls_repository-registry2:latest
+      docker tag tls_repository-registry2:latest 192.168.1.100:5443/tls_repository-registry2:latest
 
-      docker push 192.168.1.100/tls_repository-registry2:latest
+      docker push 192.168.1.100:5443/tls_repository-registry2:latest
 
     ---------- 分发证书 ----------
 
@@ -66,15 +67,15 @@ Auto deployment of an docker repository based on Docker Registry 2, supporting s
 
     分发证书到内网的各个主机（略）。
 
-    各主机将证书部署到 Docker 客户端（以主要地址 192.168.1.100 为例）：
+    各主机将证书部署到 Docker 客户端（以主要地址 192.168.1.100:5443 为例）：
 
-      sudo mkdir -p /etc/docker/certs.d/192.168.1.100
-      sudo cp domain.crt /etc/docker/certs.d/192.168.1.100/ca.crt
+      sudo mkdir -p /etc/docker/certs.d/192.168.1.100:5443
+      sudo cp domain.crt /etc/docker/certs.d/192.168.1.100:5443/ca.crt
       sudo systemctl restart docker   # 可选
 
-    ---------- 日常使用 ----------
+    ---------- 日常管理 ----------
     启动仓库容器：
-      cd /home/user/tls_repository && docker compose up
+      cd /home/user/tls_repository && docker compose up -d
     停止仓库容器：
       cd /home/user/tls_repository && docker compose down
 
