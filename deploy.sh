@@ -15,6 +15,7 @@ fi
 
 PASSWORD="$1"
 ADDRESS="$2"
+BASE64UP=$(echo -n "admin:${PASSWORD}" | base64)
 
 # 检查 _ssca.sh 是否存在
 if [ ! -f _ssca.sh ]; then
@@ -49,6 +50,7 @@ fi
 sed -i "s|^\(\s*- DOMAINS=\).*|\1\"${_ssca_SAN_DNS}\"|" compose.yaml
 sed -i "s|^\(\s*- IP_ADDRS=\).*|\1\"${_ssca_SAN_IP}\"|" compose.yaml
 sed -i "s|^\(\s*- AUTH_PASS=\).*|\1${PASSWORD}|" compose.yaml
+sed -i "s|^\(\s*- NGINX_PROXY_HEADER_Authorization=\).*|\1Basic ${BASE64UP}|" compose.yaml
 
 echo "compose.yaml 已更新"
 
@@ -63,24 +65,26 @@ if [ $? -eq 0 ]; then
         MAIN_ADDR="$_ssca_CN"
     fi
 
-    echo "等待容器启动并获取映射端口（最多60秒）..."
-    # 等待最多60秒，直到容器运行且端口映射可用
-    WAIT_SECONDS=60
+    echo "等待容器启动并获取映射端口（最多10秒）..."
+    # 等待最多10秒，直到容器运行且端口映射可用
+    WAIT_SECONDS=10
     while [ $WAIT_SECONDS -gt 0 ]; do
         # 检查容器状态是否为 running
         if docker compose ps --status running registry2 | grep -q "registry2"; then
             # 尝试获取端口
             HOST_PORT=$(docker compose port registry2 5000 2>/dev/null | cut -d: -f2)
-            if [ -n "$HOST_PORT" ]; then
+            WEB_PORT=$(docker compose port registry-ui 80 2>/dev/null | cut -d: -f2)
+            if [ -n "$HOST_PORT" ] && [ -n "$WEB_PORT" ]; then
                 break
             fi
         fi
+
         sleep 1
         WAIT_SECONDS=$((WAIT_SECONDS - 1))
     done
 
     if [ -z "$HOST_PORT" ]; then
-        echo "警告：等待60秒后仍无法获取映射端口，将默认使用443。"
+        echo "警告：等待10秒后仍无法获取映射端口，使用说明默认按 443 输出内容。"
         HOST_PORT="443"
     fi
 
@@ -138,11 +142,12 @@ if [ $? -eq 0 ]; then
     echo "  sudo cp domain.crt /etc/docker/certs.d/$CERT_DIR/ca.crt"
     echo "  sudo systemctl restart docker   # 可选"
     echo ""
-    echo "---------- 日常使用 ----------"
+    echo "---------- 日常管理 ----------"
     echo "启动仓库容器："
     echo "  cd $(pwd) && docker compose up"
     echo "停止仓库容器："
     echo "  cd $(pwd) && docker compose down"
+    echo "浏览器访问 UI 管理镜像 http://${MAIN_ADDR}:${WEB_PORT}"
     echo ""
     echo "---------- 重置证书和密码 ----------"
     echo ""
