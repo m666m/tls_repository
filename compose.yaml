@@ -31,7 +31,7 @@ services:
       # UI 基本配置
       - SINGLE_REGISTRY=true    # 隐藏“添加其他仓库”菜单，固定使用一个仓库
       - REGISTRY_TITLE=My Private Registry   # 页面标题
-      - SHOW_CONTENT_DIGEST=true    # 显示摘要
+      # - SHOW_CONTENT_DIGEST=true    # 显示摘要，注意这个摘要值不对应标签！
       - DELETE_IMAGES=true      # 启用镜像删除功能
 
       - REGISTRY_SECURED=true   # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
