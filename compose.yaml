@@ -26,7 +26,7 @@ services:
     image: joxit/docker-registry-ui:latest
     restart: always
     ports:
-      - "8080:80"               # <-- 宿主机 8080 → 容器 80，Web 管理界面 http 访问
+      - "8443:80"               # <-- 宿主机 8080 → 容器 80，Web 管理界面 http 访问
     environment:
       # UI 基本配置
       - SINGLE_REGISTRY=true    # 隐藏“添加其他仓库”菜单，固定使用一个仓库
