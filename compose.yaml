@@ -3,17 +3,17 @@ services:
     build: .                    # 使用当前目录的 Dockerfile 构建镜像
     restart: always             # 容器退出后自动重启
     ports:
-      - "443:5000"              # <-- 最好是宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
+      - "5443:5000"              # <-- 最好是宿主机 443 映射到容器 5000，docker pull/push 到标准 https 地址不需要加端口号，更方便
     volumes:
       - certs:/certs            # 命名卷 certs 挂载到 /certs
       - auth:/auth              # 命名卷 auth 挂载到 /auth
       - data:/var/lib/registry  # 命名卷 data 挂载到 /var/lib/registry
     environment:
-      - TZ=Asia/Shanghai        # 使用本地时区查看日志更方便
+      - TZ=Asia/Shanghai            # 使用本地时区查看日志更方便
       - DOMAINS=myregistry.local    # <-- 用于CA证书SAN属性的域名（空格分隔多个），请根据实际域名修改，将被 deploy.sh 替换
       - IP_ADDRS=127.0.0.1          # <-- 用于CA证书SAN属性的ip地址（空格分隔多个），请根据实际 IP 修改，将被 deploy.sh 替换
       - AUTH_USER=admin             # 用于 htpasswd 认证的用户名
-      - AUTH_PASS=secretpassword    # <-- 用于 htpasswd 认证的密码，将被 deploy.sh 替换
+      - AUTH_PASS=123456            # <-- 用于 htpasswd 认证的密码，将被 deploy.sh 替换
     # 健康检查：使用 curl 访问 registry 的 v2 端点（忽略证书验证），只要服务能响应（包括 401 未授权）即视为健康
     healthcheck:
       test: ["CMD", "curl", "-k", "https://localhost:5000/v2/"]
@@ -21,6 +21,31 @@ services:
       timeout: 5s        # 每次检测超时5秒
       retries: 3         # 连续失败3次视为不健康
       start_period: 10s  # 容器启动后10秒再开始检测，给数据库初始化时间
+
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    restart: always
+    ports:
+      - "8080:80"               # <-- 宿主机 8080 → 容器 80，Web 管理界面 http 访问
+    environment:
+      # UI 基本配置
+      - SINGLE_REGISTRY=true    # 隐藏“添加其他仓库”菜单，固定使用一个仓库
+      - REGISTRY_TITLE=My Private Registry   # 页面标题
+      - DELETE_IMAGES=true      # 启用镜像删除功能
+      - REGISTRY_SECURED=true   # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
+
+      # 代理配置：将 UI 容器内的 Nginx 反向代理到 registry2 容器
+      - NGINX_PROXY_PASS_URL=https://registry2:5000
+      # 因为 registry2 使用自签名证书，跳过 SSL 证书验证（仅测试环境）
+      - NGINX_PROXY_PASS_SSL_VERIFY=off
+
+      # 认证头注入：为所有代理请求添加 Authorization 头，格式 "Basic <base64>"
+      # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码
+      #   生成命令：echo -n "admin:123456" | base64  输出为 YWRtaW46MTIzNDU2
+      - NGINX_PROXY_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
+    depends_on:
+      registry2:
+        condition: service_healthy  # 确保 registry2 先启动
 
 # 定义命名卷（Docker 会自动创建）
 volumes:

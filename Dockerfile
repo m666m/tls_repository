@@ -22,7 +22,7 @@ RUN ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && \
 RUN mkdir -p /certs /auth /var/lib/registry
 RUN mkdir -p /etc/docker/registry
 
-# 复制预置的默认配置文件
+# 复制预置的默认配置文件，支持删除镜像
 COPY config.yml /etc/docker/registry/config.yml
 
 # 复制启动脚本
