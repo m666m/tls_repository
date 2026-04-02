@@ -29,22 +29,24 @@ services:
       - "8443:80"               # <-- 宿主机 8080 → 容器 80，Web 管理界面 http 访问
     environment:
       # UI 基本配置
-      - SINGLE_REGISTRY=true    # 隐藏“添加其他仓库”菜单，固定使用一个仓库
-      - REGISTRY_TITLE=My Private Registry   # 页面标题
-      # - SHOW_CONTENT_DIGEST=true    # 显示摘要，注意这个摘要值不对应标签！
-      - DELETE_IMAGES=true      # 启用镜像删除功能
-
-      - REGISTRY_SECURED=true   # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
+      - SINGLE_REGISTRY=true                # 隐藏“添加其他仓库”菜单，固定使用一个仓库
+      - REGISTRY_TITLE=My Private Registry
+      - DELETE_IMAGES=true                  # 启用镜像删除功能
+      # - SHOW_CONTENT_DIGEST=true          # 显示摘要，注意这个摘要值不对应标签！
 
       # 代理配置：将 UI 容器内的 Nginx 反向代理到 registry2 容器
       - NGINX_PROXY_PASS_URL=https://registry2:5000
-      # 因为 registry2 使用自签名证书，跳过 SSL 证书验证（仅测试环境）
+      # 因为 registry2 使用自签名证书，跳过 SSL 证书验证（仅测试环境）：证书 SAN 属性中很可能不包含 registry2 这个主机名
       - NGINX_PROXY_PASS_SSL_VERIFY=off
 
-      # 认证头注入：为所有代理请求添加 Authorization 头，格式 "Basic <base64>"
-      # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码，将被 deploy.sh 替换
-      #   生成命令：echo -n "admin:123456" | base64  输出为 YWRtaW46MTIzNDU2
-      - NGINX_PROXY_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
+      # 如果远程仓库需要 Basic Auth，需要为所有代理请求添加 Authorization 头，格式 "Basic <base64>"
+      # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码
+      # 生成命令：echo -n "admin:123456" | base64  输出为 YWRtaW46MTIzNDU2
+      - NGINX_PROXY_PASS_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
+
+      # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
+      - REGISTRY_SECURED=true
+
     depends_on:
       registry2:
         condition: service_healthy  # 确保 registry2 先启动
