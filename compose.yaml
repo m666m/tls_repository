@@ -42,7 +42,7 @@ services:
       # 如果远程仓库需要 Basic Auth，需要为所有代理请求添加 Authorization 头，格式 "Basic <base64>"
       # <-- 请将下面示例中的 base64 替换为你实际用户名密码的编码
       # 生成命令：echo -n "admin:123456" | base64  输出为 YWRtaW46MTIzNDU2
-      - NGINX_PROXY_PASS_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
+      - NGINX_PROXY_HEADER_Authorization=Basic YWRtaW46MTIzNDU2
 
       # 告知 UI 后端 Registry 需要认证，减少不必要的 401 请求
       - REGISTRY_SECURED=true
