@@ -11,6 +11,20 @@ set -e
 # 为保证可多次执行，如果证书等文件已经存在则不使用这些变量生成对应的文件
 # 然后引导 registry 启动仓库服务
 
+# 动态设置时区
+if [ -n "$TZ" ]; then
+    echo "INFO: Setting timezone to $TZ"
+    # 确保目标时区文件存在
+    if [ -f "/usr/share/zoneinfo/$TZ" ]; then
+        ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime
+        echo "$TZ" > /etc/timezone
+    else
+        echo "WARNING: Timezone $TZ not found, keeping default."
+    fi
+else
+    echo "INFO: TZ environment variable not set, using default."
+fi
+
 # ---------- TLS 证书处理 ----------
 if [ ! -f /certs/domain.crt ] || [ ! -f /certs/domain.key ]; then
     # 需要生成证书，必须提供域名或 IP 列表

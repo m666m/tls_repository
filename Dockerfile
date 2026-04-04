@@ -15,8 +15,8 @@ RUN apk --update add --no-cache \
 
 # 支持运行容器时使用环境变量 TZ 设置时区 https://wiki.alpinelinux.org/wiki/Setting_the_timezone
 ENV TZ=UTC
-RUN ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && \
-    echo ${TZ} > /etc/timezone
+#RUN ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && \
+#    echo ${TZ} > /etc/timezone
 
 # 创建必要的目录
 RUN mkdir -p /certs /auth /var/lib/registry
