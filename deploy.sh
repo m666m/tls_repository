@@ -53,6 +53,11 @@ sed -i "s|^\(\s*- AUTH_PASS=\).*|\1${PASSWORD}|" compose.yaml
 sed -i "s|^\(\s*- NGINX_PROXY_HEADER_Authorization=\).*|\1Basic ${BASE64UP}|" compose.yaml
 
 echo "compose.yaml 已更新"
+# 静默正常输出，但保留错误信息（推荐）
+docker compose config >/dev/null || {
+    echo "❌ compose.yaml error!" >&2
+    exit 1
+}
 
 echo "正在构建镜像并启动容器..."
 docker compose up --build -d
